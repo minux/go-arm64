@@ -166,7 +166,12 @@ enum cs
 
 	C_VREG,
 
+	C_0EFFECTIVEADDRESS,
+	C_EFFECTIVEADDRESS,
+	C_LONGEFFECTIVEADDRESS,
+
 	C_GOK,
+
 	C_NCLASS,	/* must be last */
 };
 

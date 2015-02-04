@@ -626,6 +626,9 @@ static Optab optab[] = {
 	{ ADUFFZERO,	C_NONE,	C_NONE,	C_SBRA,		 5, 4, 0 },	// same as AB/ABL
 	{ ADUFFCOPY,	C_NONE,	C_NONE,	C_SBRA,		 5, 4, 0 },	// same as AB/ABL
 
+	{ AMOV,		C_EFFECTIVEADDRESS,	C_NONE,	C_REG,		66, 4, 0 },
+	{ AMOV,		C_LONGEFFECTIVEADDRESS,	C_NONE,	C_REG,		67, 8, 0 },
+
 	{ AXXX,		C_NONE,	C_NONE,	C_NONE,		 0, 4, 0 },
 };
 
@@ -921,6 +924,7 @@ addpool(Link *ctxt, Prog *p, Addr *a)
 	case C_LACON:
 	case C_LCON:
 	case C_VCON:
+	case C_0EFFECTIVEADDRESS:
 		if(a->name == D_EXTERN) {
 			print("addpool: %^ in %P needs reloc\n", c, p);
 		}
@@ -1126,6 +1130,13 @@ aclass(Link *ctxt, Addr *a)
 			ctxt->instoffset = a->offset;
 			if(a->reg == REGSP && ctxt->instoffset != 0)
 				goto aconsize;
+			if(a->reg != NREG) {
+				if(ctxt->instoffset == 0)
+					return C_0EFFECTIVEADDRESS;
+				if(isaddcon(ctxt->instoffset))
+					return C_EFFECTIVEADDRESS;
+				return C_LONGEFFECTIVEADDRESS;
+			}
 			v = ctxt->instoffset;
 			if(v == 0)
 				return C_ZCON;
@@ -1247,12 +1258,15 @@ cmp(int a, int b)
 	if(a == b)
 		return 1;
 	switch(a) {
+	case C_EFFECTIVEADDRESS:
+		if(b == C_0EFFECTIVEADDRESS)
+			return 1;
 	case C_RSP:
-		if(b == C_REG)
+		if(b == C_REG || b == C_0EFFECTIVEADDRESS)
 			return 1;
 		break;
 	case C_REG:
-		if(b == C_ZCON)
+		if(b == C_ZCON || b == C_0EFFECTIVEADDRESS)
 			return 1;
 		break;
 	case C_ADDCON0:
@@ -1272,7 +1286,7 @@ cmp(int a, int b)
 			return 1;
 		break;
 	case C_LCON:
-		if(b == C_ZCON || b == C_BITCON || b == C_ADDCON || b == C_ADDCON0 || b == C_ABCON || b == C_MBCON || b == C_MOVCON)
+		if(b == C_ZCON || b == C_BITCON || b == C_ADDCON || b == C_ADDCON0 || b == C_ABCON || b == C_MBCON || b == C_MOVCON || b == C_0EFFECTIVEADDRESS)
 			return 1;
 		break;
 	case C_VCON:
@@ -2664,6 +2678,16 @@ if(0 /*debug['P']*/) print("%ux: %P	type %d\n", (uint32)(p->pc), p, o->type);
 		if(!o1)
 			break;
 		o2 = olsr12u(ctxt, opldr12(ctxt, p->as), 0, REGTMP, p->to.reg);
+		break;
+	case 66: /* mov $OFFSET(Ra), Rb -> add xb, xa, offset */
+		o1 = 1<<31 | 1<<28 | 1<<24 | p->from.offset<<10 | p->from.reg << 5 | p->to.reg;
+		print("assembling %P\n", p);
+		break;
+	case 67: /* mov $LARGE_OFFSET(Ra), Rb -> add xb, xa, offset */
+		// This is very very wrong!
+		print("misassembling %P\n", p);
+		o1 = omovlit(ctxt, AMOV, p, &p->from, p->to.reg);
+		o2 = 1<<31 | 1<<27 | 1<<25 | 1<<24 | p->from.reg<<16 | p->to.reg << 5 | p->to.reg;
 		break;
 	case 90:
 		// This is supposed to be something that stops execution.
