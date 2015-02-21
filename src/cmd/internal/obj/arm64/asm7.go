@@ -264,6 +264,7 @@ var optab = []Optab{
 	Optab{ADWORD, C_NONE, C_NONE, C_LEXT, 11, 8, 0, 0},
 	Optab{ADWORD, C_NONE, C_NONE, C_ADDR, 11, 8, 0, 0},
 	Optab{ADWORD, C_NONE, C_NONE, C_LACON, 11, 8, 0, 0},
+	Optab{AWORD, C_NONE, C_NONE, C_VCON, 14, 4, 0, 0},
 	Optab{AWORD, C_NONE, C_NONE, C_LCON, 14, 4, 0, 0},
 	Optab{AWORD, C_NONE, C_NONE, C_LEXT, 14, 4, 0, 0},
 	Optab{AWORD, C_NONE, C_NONE, C_ADDR, 14, 4, 0, 0},
@@ -785,7 +786,7 @@ func addpool(ctxt *obj.Link, p *obj.Prog, a *obj.Addr) {
 	switch c {
 	// TODO(aram): remove.
 	default:
-		if a.Name != D_EXTERN {
+		if a.Name != D_EXTERN && a.Name != D_STATIC {
 
 			fmt.Printf("addpool: %v in %v shouldn't go to default case\n", DRconv(c), p)
 		}
