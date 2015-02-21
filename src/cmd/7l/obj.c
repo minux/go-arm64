@@ -77,7 +77,7 @@ archinit(void)
 			INITRND = 4096;
 		break;
 	case Hlinux:	/* arm64 elf */
-		debug['d'] = 1;	// TODO(aram): dynamic linking is not supported yet.
+		//debug['d'] = 1;	// TODO(aram): dynamic linking is not supported yet.
 		elfinit();
 		HEADR = ELFRESERVE;
 		if(INITTEXT == -1)
