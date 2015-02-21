@@ -90,7 +90,7 @@ var lexinit = []asm.Lextab{
 	{"R25", LREG, 25},
 	{"R26", LREG, 26},
 	{"R27", LREG, 27},
-	{"g", LREG, 28}, // avoid unintentionally clobbering g using R28
+	{"g", LREG, 28},   // avoid unintentionally clobbering g using R28
 	{"RFP", LREG, 29}, // avoid unintentionally clobbering the frame pointer using R29
 	{"R30", LREG, 30},
 	{"LR", LREG, 30},
@@ -185,6 +185,7 @@ var lexinit = []asm.Lextab{
 	//	{ "SPSR_und",	LSPREG,	arm64.D_SPSR_und },
 	{"DAIFSet", LSPREG, arm64.D_DAIFSet},
 	{"DAIFClr", LSPREG, arm64.D_DAIFClr},
+	{"TPIDR_EL0", LSPREG, arm64.D_TPIDR_EL0},
 	{"EQ", LCOND, 0},
 	{"NE", LCOND, 1},
 	{"CS", LCOND, 2},

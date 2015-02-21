@@ -317,6 +317,7 @@ struct
 //	{ "SPSR_und",	LSPREG,	D_SPSR_und },
 	{ "DAIFSet",	LSPREG,	D_DAIFSet },
 	{ "DAIFClr",	LSPREG,	D_DAIFClr },
+	{ "TPIDR_EL0",	LSPREG, D_TPIDR_EL0 },
 
 	{ "EQ",		LCOND,	0 },
 	{ "NE",		LCOND,	1 },
