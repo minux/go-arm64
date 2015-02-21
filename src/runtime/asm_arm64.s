@@ -320,8 +320,8 @@ g0:
 	MOV	R13, SP
 	MOV	R4, 0(RSP)	// save old g on stack
 	MOV	(g_stack+stack_hi)(R4), R4
-	SUB	R2, R5
-	MOV	R5, 8(RSP)	// save depth in old g stack (can't just save SP, as stack might be copied during a callback)
+	SUB	R2, R4
+	MOV	R4, 8(RSP)	// save depth in old g stack (can't just save SP, as stack might be copied during a callback)
 	BL	(R1)
 	MOV	R0, R9
 
@@ -329,7 +329,7 @@ g0:
 	MOV	0(RSP), g
 	BL	runtime·save_g(SB)
 	MOV	(g_stack+stack_hi)(g), R5
-	MOV	8(SP), R6
+	MOV	8(RSP), R6
 	SUB	R6, R5
 	MOV	R9, R0
 	MOV	R5, SP
