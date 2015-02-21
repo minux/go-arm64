@@ -12,14 +12,14 @@
 #endif
 
 /*
- * void crosscall_arm64(void (*fn)(void), void (*setg_gcc)(void *g), void *g)
+ * void crosscall1(void (*fn)(void), void (*setg_gcc)(void *g), void *g)
  *
  * Calling into the 7g tool chain, where all registers are caller save.
  * Called from standard ARM EABI, where x19-x29 are callee-save, so they
  * must be saved explicitly, along with x30 (LR).
  */
-.globl EXT(crosscall_arm64)
-EXT(crosscall_arm64):
+.globl EXT(crosscall1)
+EXT(crosscall1):
 	stp x19, x20, [sp, #-16]!
 	stp x21, x22, [sp, #-16]!
 	stp x23, x24, [sp, #-16]!
