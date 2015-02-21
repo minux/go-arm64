@@ -269,31 +269,91 @@ loop:
 done:
 	RETURN
 
+// asmcgocall(void(*fn)(void*), void *arg)
+// Call fn(arg) on the scheduler stack,
+// aligned appropriately for the gcc ABI.
+// See cgocall.go for more details.
+TEXT ·asmcgocall(SB),NOSPLIT,$0-16
+	MOV	fn+0(FP), R1
+	MOV	arg+8(FP), R0
+	BL	asmcgocall<>(SB)
+	RETURN
+
+TEXT ·asmcgocall_errno(SB),NOSPLIT,$0-24
+	MOV	fn+0(FP), R1
+	MOV	arg+8(FP), R0
+	BL	asmcgocall<>(SB)
+	MOV	R0, ret+16(FP)
+	RETURN
+
+// asmcgocall common code. fn in R1, arg in R0. returns errno in R0.
+TEXT asmcgocall<>(SB),NOSPLIT,$0-0
+	MOV	SP, R2		// save original stack pointer
+	MOV	g, R4
+
+	// Figure out if we need to switch to m->g0 stack.
+	// We get called to create new OS threads too, and those
+	// come in on the m->g0 stack already.
+	MOV	g_m(g), R8
+	MOV	m_g0(R8), R3
+	CMP	R3, g
+	BEQ	g0
+	MOV	R0, R9	// gosave<> and save_g might clobber R0
+	BL	gosave<>(SB)
+	MOV	R3, g
+	BL	runtime·save_g(SB)
+	MOV	(g_sched+gobuf_sp)(g), R0
+	MOV	R0, SP
+	MOV	R9, R0
+
+	// Now on a scheduling stack (a pthread-created stack).
+g0:
+	// Save room for two of our pointers /*, plus 32 bytes of callee
+	// save area that lives on the caller stack. */
+	MOV	SP, R13
+	SUB	$16, R13
+	MOV	R13, SP
+	MOV	R4, 0(RSP)	// save old g on stack
+	MOV	(g_stack+stack_hi)(R4), R4
+	SUB	R2, R5
+	MOV	R5, 8(RSP)	// save depth in old g stack (can't just save SP, as stack might be copied during a callback)
+	BL	(R1)
+	MOV	R0, R9
+
+	// Restore g, stack pointer.  R0 is errno, so don't touch it
+	MOV	0(RSP), g
+	BL	runtime·save_g(SB)
+	MOV	(g_stack+stack_hi)(g), R5
+	MOV	8(SP), R6
+	SUB	R6, R5
+	MOV	R9, R0
+	MOV	R5, SP
+	RETURN
+
 // cgocallback(void (*fn)(void*), void *frame, uintptr framesize)
 // Turn the fn into a Go func (by taking its address) and call
 // cgocallback_gofunc.
 TEXT runtime·cgocallback(SB),NOSPLIT,$24-24
-	MOV	$fn+0(FP), R3
-	MOV	R3, 8(RSP)
-	MOV	frame+8(FP), R3
-	MOV	R3, 16(RSP)
-	MOV	framesize+16(FP), R3
-	MOV	R3, 24(RSP)
-	MOV	$runtime·cgocallback_gofunc(SB), R3
-	BL	(R3)
+	MOV	$fn+0(FP), R0
+	MOV	R0, 8(RSP)
+	MOV	frame+8(FP), R0
+	MOV	R0, 16(RSP)
+	MOV	framesize+16(FP), R0
+	MOV	R0, 24(RSP)
+	MOV	$runtime·cgocallback_gofunc(SB), R0
+	BL	(R0)
 	RETURN
 
 // cgocallback_gofunc(FuncVal*, void *frame, uintptr framesize)
-// See cgocall.c for more details.
+// See cgocall.go for more details.
 TEXT ·cgocallback_gofunc(SB),NOSPLIT,$16-24
 	NO_LOCAL_POINTERS
 
-	// Load m and g from thread-local storage.
+	// Load g from thread-local storage.
 	MOVB	runtime·iscgo(SB), R3
-	CMP	$0, R3 
+	CMP	$0, R3
 	BEQ	nocgo
-	// TODO(aram):
-	BL runtime·abort(SB)
+	BL	runtime·load_g(SB)
 nocgo:
 
 	// If g is nil, Go did not create the current thread.
@@ -304,8 +364,8 @@ nocgo:
 	CMP	$0, g
 	BNE	havem
 	MOV	g, savedm-8(SP) // g is zero, so is m.
-	MOV	$runtime·needm(SB), R3
-	BL	(R3)
+	MOV	$runtime·needm(SB), R0
+	BL	(R0)
 
 	// Set m->sched.sp = SP, so that if a panic happens
 	// during the function we are about to execute, it will
@@ -318,8 +378,8 @@ nocgo:
 	// and then systemstack will try to use it. If we don't set it here,
 	// that restored SP will be uninitialized (typically 0) and
 	// will not be usable.
-	MOV	g_m(g), R3
-	MOV	m_g0(R3), R3
+	MOV	g_m(g), R8
+	MOV	m_g0(R8), R3
 	MOV	SP, R0
 	MOV	R0, (g_sched+gobuf_sp)(R3)
 
@@ -330,7 +390,7 @@ havem:
 	// Save current m->g0->sched.sp on stack and then set it to SP.
 	// Save current sp in m->g0->sched.sp in preparation for
 	// switch back to m->curg stack.
-	// NOTE: unwindm knows that the saved g->sched.sp is at 8(R1) aka savedsp-16(SP).
+	// NOTE: unwindm knows that the saved g->sched.sp is at 8(RSP) aka savedsp-16(SP).
 	MOV	m_g0(R8), R3
 	MOV	(g_sched+gobuf_sp)(R3), R4
 	MOV	R4, savedsp-16(SP)
@@ -356,15 +416,16 @@ havem:
 	BL	runtime·save_g(SB)
 	MOV	(g_sched+gobuf_sp)(g), R4 // prepare stack as R4
 	MOV	(g_sched+gobuf_pc)(g), R5
-	MOV	R5, -24(R4)
-	MOV	$-24(R4), R0
+	MOV	R5, -(24+8)(R4)	// maintain 16-byte SP alignment
+	MOV	$-(24+8)(R4), R0
 	MOV	R0, SP
 	BL	runtime·cgocallbackg(SB)
 
 	// Restore g->sched (== m->curg->sched) from saved values.
-	MOV	0(SP), R5
+	MOV	0(RSP), R5
 	MOV	R5, (g_sched+gobuf_pc)(g)
-	MOV	$24(SP), R4
+	MOV	SP, R4
+	ADD	$(24+8), R4, R4
 	MOV	R4, (g_sched+gobuf_sp)(g)
 
 	// Switch back to m->g0's stack and restore m->g0->sched.sp.
@@ -383,12 +444,30 @@ havem:
 	MOV	savedm-8(SP), R6
 	CMP	$0, R6
 	BNE	droppedm
-	MOV	$runtime·dropm(SB), R3
-	BL	(R3)
+	MOV	$runtime·dropm(SB), R0
+	BL	(R0)
 droppedm:
 
 	// Done!
-	RET
+	RETURN
+
+// Called from cgo wrappers, this function returns g->m->curg.stack.hi.
+// Must obey the gcc calling convention.
+TEXT _cgo_topofstack(SB),NOSPLIT,$16
+	// g (R28) and REGTMP (R27)  might be clobbered by load_g. They
+	// are callee-save in the gcc calling convention, so save them.
+	MOV	R27, savedR27-8(SP)
+	MOV	g, saveG-16(SP)
+
+	BL	runtime·load_g(SB)
+	MOV	g_m(g), R0
+	MOV	m_curg(R0), R0
+	MOV	(g_stack+stack_hi)(R0), R0
+
+	MOV	saveG-16(SP), g
+	MOV	savedR28-8(SP), R27
+	RETURN
+
 
 TEXT runtime·getcallerpc(SB),NOSPLIT,$-8-16
 	MOV	0(SP), R0
@@ -761,79 +840,6 @@ again:
 	SUBW	$1, R0
 	CBNZ	R0, again
 	RETURN
-
-// asmcgocall(void(*fn)(void*), void *arg)
-// Call fn(arg) on the scheduler stack,
-// aligned appropriately for the gcc ABI.
-// See cgocall.c for more details.
-TEXT ·asmcgocall(SB),NOSPLIT,$0-16
-	MOV	fn+0(FP), R3
-	MOV	arg+8(FP), R4
-	BL	asmcgocall<>(SB)
-	RET
-
-TEXT ·asmcgocall_errno(SB),NOSPLIT,$0-20
-	MOV	fn+0(FP), R3
-	MOV	arg+8(FP), R4
-	BL	asmcgocall<>(SB)
-	MOVW	R0, ret+16(FP)
-	RET
-
-// asmcgocall common code. fn in R3, arg in R4. returns errno in R0.
-TEXT asmcgocall<>(SB),NOSPLIT,$0-0
-	MOV	SP, R2		// save original stack pointer
-	MOV	g, R5
-
-	// Figure out if we need to switch to m->g0 stack.
-	// We get called to create new OS threads too, and those
-	// come in on the m->g0 stack already.
-	MOV	g_m(g), R6
-	MOV	m_g0(R6), R6
-	CMP	R6, g
-	BEQ	g0
-	BL	gosave<>(SB)
-	MOV	R6, g
-	BL	runtime·save_g(SB)
-	MOV	(g_sched+gobuf_sp)(g), R13
-	MOV	R13, SP
-
-	// Now on a scheduling stack (a pthread-created stack).
-g0:
-	// Save room for two of our pointers, plus 32 bytes of callee
-	// save area that lives on the caller stack.
-	MOV	SP, R13
-	SUB	$48, R13
-	AND	$~15, R13	// 16-byte alignment for gcc ABI
-	MOV	R13, SP
-	MOV	R5, 40(SP)	// save old g on stack
-	MOV	(g_stack+stack_hi)(R5), R5
-	SUB	R2, R5
-	MOV	R5, 32(SP)	// save depth in old g stack (can't just save SP, as stack might be copied during a callback)
-	MOV	R0, 0(SP)	// clear back chain pointer (TODO can we give it real back trace information?)
-	// This is a "global call", so put the global entry point in r12
-	MOV	R3, R12
-	MOV	R4, R0
-	BL	(R12)
-
-	// Restore g, stack pointer.  R0 is errno, so don't touch it
-	MOV	40(SP), g
-	BL	runtime·save_g(SB)
-	MOV	(g_stack+stack_hi)(g), R5
-	MOV	32(SP), R6
-	SUB	R6, R5
-	MOV	R5, SP
-	RET
-
-// TODO(aram): doc..
-TEXT runtime·save_g(SB),NOSPLIT,$-8-0
-	MOVB	runtime·iscgo(SB), R0
-	CMP	$0, R0
-	BEQ	nocgo
-
-	BL	runtime·abort(SB)
-
-nocgo:
-	RET
 
 // Save state of caller into g->sched. Smashes R0.
 TEXT gosave<>(SB),NOSPLIT,$-8
