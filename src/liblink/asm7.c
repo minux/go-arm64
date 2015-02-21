@@ -363,7 +363,6 @@ static Optab optab[] = {
 	{ ADWORD,	C_NONE,	C_NONE,	C_ADDR,		11, 8, 0 },
 	{ ADWORD,	C_NONE,	C_NONE,	C_LACON,		11, 8, 0 },	
 
-	{ AWORD,	C_NONE,	C_NONE,	C_VCON,		14, 4, 0 },
 	{ AWORD,	C_NONE,	C_NONE,	C_LCON,		14, 4, 0 },
 	{ AWORD,	C_NONE,	C_NONE,	C_LEXT,		14, 4, 0 },
 	{ AWORD,	C_NONE,	C_NONE,	C_ADDR,		14, 4, 0 },
@@ -1167,6 +1166,8 @@ aclass(Link *ctxt, Addr *a)
 			}
 			if(isbitcon(v))
 				return C_BITCON;
+			if(v == (uvlong)(uint32)v || v == (vlong)(int32)v)
+				return C_LCON;
 			return C_VCON;
 		case D_EXTERN:
 		case D_STATIC:
