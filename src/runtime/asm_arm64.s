@@ -395,7 +395,8 @@ havem:
 	// Save current m->g0->sched.sp on stack and then set it to SP.
 	// Save current sp in m->g0->sched.sp in preparation for
 	// switch back to m->curg stack.
-	// NOTE: unwindm knows that the saved g->sched.sp is at 8(RSP) aka savedsp-16(SP).
+	// NOTE: unwindm knows that the saved g->sched.sp is at 16(RSP) aka savedsp-16(SP).
+	// Beware that the frame size is actually 32.
 	MOV	m_g0(R8), R3
 	MOV	(g_sched+gobuf_sp)(R3), R4
 	MOV	R4, savedsp-16(SP)
