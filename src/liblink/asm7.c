@@ -2692,7 +2692,7 @@ if(0 /*debug['P']*/) print("%ux: %P	type %d\n", (uint32)(p->pc), p, o->type);
 		v = p->from.offset;
 		if(v < -512 || v > 504)
 			ctxt->diag("offset out of range\n%P", p);
-		if(p->to.type == D_XPOST)
+		if(p->from.type == D_XPOST)
 			o1 |= 1 << 23;
 		else
 			o1 |= 3 << 23;
