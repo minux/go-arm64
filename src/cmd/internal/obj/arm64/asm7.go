@@ -2931,7 +2931,7 @@ func asmout(ctxt *obj.Link, p *obj.Prog, o *Optab, out []uint32) {
 		if v < -512 || v > 504 {
 			ctxt.Diag("offset out of range\n%v", p)
 		}
-		if p.To.Type == D_XPOST {
+		if p.From.Type == D_XPOST {
 			o1 |= 1 << 23
 		} else {
 
