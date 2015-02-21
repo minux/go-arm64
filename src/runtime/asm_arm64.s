@@ -192,7 +192,8 @@ TEXT runtime·rt0_go(SB),NOSPLIT,$0
 	MOV	_cgo_init(SB), R12
 	CMP	$0, R12
 	BEQ	nocgo
-	WORD    $0xd53bd040    		// mrs x0, tpidr_el0; load TLS base pointer
+
+	MRS	TPIDR_EL0, R0		// load TLS base pointer
 	MOV	R0, R3			// arg 3: TLS base pointer
 	//MOV	$runtime·tlsg(SB), R2 	// arg 2: tlsg
 	MOV	$0x10, R2		// arg 2: tlsg TODO(minux): hardcoded for linux
