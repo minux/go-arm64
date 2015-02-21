@@ -434,14 +434,17 @@ func adjustframe(frame *stkframe, arg unsafe.Pointer) bool {
 	// Adjust local variables if stack frame has been allocated.
 	size := frame.varp - frame.sp
 	var minsize uintptr
-	if thechar != '6' && thechar != '8' {
+	if thechar != '6' && thechar != '8' && thechar != '7' { // TODO(minux): use switch? always use spAlign?
 		minsize = ptrSize
+	} else if thechar == '7' {
+		minsize = spAlign // TODO(minux): this seems not safe, what if localsize is exactly one pointer?
 	} else {
 		minsize = 0
 	}
-	if size > minsize {
+	if stackmap := (*stackmap)(funcdata(f, _FUNCDATA_LocalsPointerMaps)); size > minsize || stackmap != nil {
+	//if size > minsize {
 		var bv bitvector
-		stackmap := (*stackmap)(funcdata(f, _FUNCDATA_LocalsPointerMaps))
+		//stackmap := (*stackmap)(funcdata(f, _FUNCDATA_LocalsPointerMaps))
 		if stackmap == nil || stackmap.n <= 0 {
 			print("runtime: frame ", funcname(f), " untyped locals ", hex(frame.varp-size), "+", hex(size), "\n")
 			throw("missing stackmap")
