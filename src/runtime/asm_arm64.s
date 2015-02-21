@@ -192,8 +192,13 @@ TEXT runtime·rt0_go(SB),NOSPLIT,$0
 	MOV	_cgo_init(SB), R12
 	CMP	$0, R12
 	BEQ	nocgo
-
-	BL	runtime·abort(SB)
+	WORD    $0xd53bd040    		// mrs x0, tpidr_el0; load TLS base pointer
+	MOV	R0, R3			// arg 3: TLS base pointer
+	//MOV	$runtime·tlsg(SB), R2 	// arg 2: tlsg
+	MOV	$0x10, R2		// arg 2: tlsg TODO(minux): hardcoded for linux
+	MOV	$setg_gcc<>(SB), R1	// arg 1: setg
+	MOV	g, R0			// arg 0: G
+	BL	(R12)
 
 nocgo:
 	// update stackguard after _cgo_init
@@ -703,6 +708,14 @@ TEXT runtime·setg(SB), NOSPLIT, $0-8
 	MOV	gg+0(FP), g
 	// This only happens if iscgo, so jump straight to save_g
 	BL	runtime·save_g(SB)
+	RETURN
+
+// void setg_gcc(G*); set g called from gcc
+TEXT setg_gcc<>(SB),NOSPLIT,$8
+	MOV	R0, g
+	MOV	R27, savedR27-8(SP)
+	BL	runtime·save_g(SB)
+	MOV	savedR27-8(SP), R27
 	RETURN
 
 // reflectcall: call a function with the given argument list
