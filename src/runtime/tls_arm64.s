@@ -12,7 +12,7 @@ TEXT runtime·load_g(SB),NOSPLIT,$0
 	CMP	$0, R0
 	BEQ	nocgo
 
-	WORD	$0xd53bd040	// mrs     x0, tpidr_el0
+	MRS	TPIDR_EL0, R0
 	MOV	0x10(R0), g
 
 nocgo:
@@ -23,7 +23,7 @@ TEXT runtime·save_g(SB),NOSPLIT,$0
 	CMP	$0, R0
 	BEQ	nocgo
 
-	WORD	$0xd53bd040	// mrs     x0, tpidr_el0
+	MRS	TPIDR_EL0, R0
 	MOV	g, 0x10(R0)
 
 nocgo:
