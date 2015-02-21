@@ -32,8 +32,8 @@ EXT(crosscall_arm64):
 	mov x20, x1
 	mov x0, x2
 
-	blr x19
 	blr x20
+	blr x19
 
 	ldp x29, x30, [sp], #16
 	ldp x27, x28, [sp], #16
