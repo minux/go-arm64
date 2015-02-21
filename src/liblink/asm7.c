@@ -880,7 +880,7 @@ addpool(Link *ctxt, Prog *p, Addr *a)
 	switch(c) {
 	default:
 		// TODO(aram): remove.
-		if(a->name != D_EXTERN) {
+		if(a->name != D_EXTERN && a->name != D_STATIC) {
 			print("addpool: %^ in %P shouldn't go to default case\n", c, p);
 		}
 		t.to.offset = a->offset;
