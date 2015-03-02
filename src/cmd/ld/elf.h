@@ -587,8 +587,9 @@ typedef struct {
 
 #define R_AARCH64_ABS64		257
 #define R_AARCH64_ABS32		258
+#define R_AARCH64_ADR_PREL_PG_HI21	275
+#define R_AARCH64_ADD_ABS_LO12_NC	277
 #define R_AARCH64_CALL26	283
-
 
 #define	R_386_NONE	0	/* No relocation. */
 #define	R_386_32	1	/* Add symbol value. */
