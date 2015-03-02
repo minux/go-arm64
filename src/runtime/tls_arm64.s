@@ -6,13 +6,14 @@
 #include "go_tls.h"
 #include "funcdata.h"
 #include "textflag.h"
+#include "tls_arm64.h"
 
 TEXT runtime·load_g(SB),NOSPLIT,$0
 	MOVB	runtime·iscgo(SB), R0
 	CMP	$0, R0
 	BEQ	nocgo
 
-	MRS	TPIDR_EL0, R0
+	MRS	TPIDR, R0
 	MOV	0x10(R0), g
 
 nocgo:
@@ -23,7 +24,7 @@ TEXT runtime·save_g(SB),NOSPLIT,$0
 	CMP	$0, R0
 	BEQ	nocgo
 
-	MRS	TPIDR_EL0, R0
+	MRS	TPIDR, R0
 	MOV	g, 0x10(R0)
 
 nocgo:

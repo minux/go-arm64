@@ -6,6 +6,7 @@
 #include "go_tls.h"
 #include "funcdata.h"
 #include "textflag.h"
+#include "tls_arm64.h"
 
 DATA	runtime·main·f+0(SB)/8,$runtime·main(SB)
 GLOBL	runtime·main·f(SB),RODATA,$8
@@ -193,7 +194,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT,$0
 	CMP	$0, R12
 	BEQ	nocgo
 
-	MRS	TPIDR_EL0, R0		// load TLS base pointer
+	MRS	TPIDR, R0		// load TLS base pointer
 	MOV	R0, R3			// arg 3: TLS base pointer
 	//MOV	$runtime·tlsg(SB), R2 	// arg 2: tlsg
 	MOV	$0x10, R2		// arg 2: tlsg TODO(minux): hardcoded for linux
