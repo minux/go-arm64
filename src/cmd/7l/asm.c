@@ -159,6 +159,7 @@ machoreloc1(Reloc *r, vlong sectoff)
 int
 archreloc(Reloc *r, LSym *s, vlong *val)
 {
+	LSym *rs;
 	vlong t;
 	uint32 o0, o1;
 	int i;
@@ -172,8 +173,31 @@ archreloc(Reloc *r, LSym *s, vlong *val)
 
 		case R_ADDRARM64:
 			r->done = 0;
-			r->xsym = r->sym;
+			r->xadd = r->add;
 			r->add = 0;
+
+			// if *val is actual instructions being relocated, then all
+			// these code can be removed.
+			o0 = o1 = 0;
+			for(i = 0; i < 4; i++)
+				((uchar*)&o0)[inuxi4[i]] = s->p[r->off + i];
+			for(i = 0; i < 4; i++)
+				((uchar*)&o1)[inuxi4[i]] = s->p[r->off + 4 + i];
+			// when laid out, the instruction order must always be o1, o2.
+			if(ctxt->arch->endian == BigEndian)
+				*val = ((vlong)o0 << 32) | o1;
+			else
+				*val = ((vlong)o1 << 32) | o0;
+
+			// set up addend for eventual relocation via outer symbol.
+			rs = r->sym;
+			while(rs->outer != nil) {
+				r->xadd += symaddr(rs) - symaddr(rs->outer);
+				rs = rs->outer;
+			}
+			if(rs->type != SHOSTOBJ && rs->sect == nil)
+				diag("missing section for %s", rs->name);
+			r->xsym = rs;
 			break;
 
 		case R_CALLARM64:
@@ -210,7 +234,7 @@ archreloc(Reloc *r, LSym *s, vlong *val)
 		o0 |= (((t >> 12)&3)<<29) | (((t>>12>>2) & 0x7ffff) << 5);
 		o1 |= (t & 0xfff) << 10;
 		// when laid out, the instruction order must always be o1, o2.
-		if (ctxt->arch->endian == BigEndian)
+		if(ctxt->arch->endian == BigEndian)
 			*val = ((vlong)o0 << 32) | o1;
 		else
 			*val = ((vlong)o1 << 32) | o0;
