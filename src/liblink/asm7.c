@@ -369,16 +369,16 @@ static Optab optab[] = {
 	{ AMOV,	C_VCON,	C_NONE,	C_REG,		12, 4, 0,	LFROM },
 	{ AMOV,	C_VCONADDR,	C_NONE,	C_REG,		68, 8, 0 },
 
-	{ AMOVB,	C_REG,	C_NONE,	C_ADDR,		64, 8, 0,	LTO },
-	{ AMOVBU,	C_REG,	C_NONE,	C_ADDR,		64, 8, 0,	LTO },
-	{ AMOVH,	C_REG,	C_NONE,	C_ADDR,		64, 8, 0,	LTO },
-	{ AMOVW,	C_REG,	C_NONE,	C_ADDR,		64, 8, 0,	LTO },
-	{ AMOV,	C_REG,	C_NONE,	C_ADDR,		64, 8, 0,	LTO },
-	{ AMOVB,	C_ADDR,	C_NONE,	C_REG,		65, 8, 0,	LFROM },
-	{ AMOVBU,	C_ADDR,	C_NONE,	C_REG,		65, 8, 0,	LFROM },
-	{ AMOVH,	C_ADDR,	C_NONE,	C_REG,		65, 8, 0,	LFROM },
-	{ AMOVW,	C_ADDR,	C_NONE,	C_REG,		65, 8, 0,	LFROM },
-	{ AMOV,	C_ADDR,	C_NONE,	C_REG,		65, 8, 0,	LFROM },
+	{ AMOVB,	C_REG,	C_NONE,	C_ADDR,		64, 12, 0 },
+	{ AMOVBU,	C_REG,	C_NONE,	C_ADDR,		64, 12, 0 },
+	{ AMOVH,	C_REG,	C_NONE,	C_ADDR,		64, 12, 0 },
+	{ AMOVW,	C_REG,	C_NONE,	C_ADDR,		64, 12, 0 },
+	{ AMOV,	C_REG,	C_NONE,	C_ADDR,		64, 12, 0 },
+	{ AMOVB,	C_ADDR,	C_NONE,	C_REG,		65, 12, 0 },
+	{ AMOVBU,	C_ADDR,	C_NONE,	C_REG,		65, 12, 0 },
+	{ AMOVH,	C_ADDR,	C_NONE,	C_REG,		65, 12, 0 },
+	{ AMOVW,	C_ADDR,	C_NONE,	C_REG,		65, 12, 0 },
+	{ AMOV,	C_ADDR,	C_NONE,	C_REG,		65, 12, 0 },
 
 	{ AMUL,		C_REG,	C_REG,	C_REG,		15, 4, 0 },
 	{ AMUL,		C_REG,	C_NONE,	C_REG,		15, 4, 0 },
@@ -576,10 +576,10 @@ static Optab optab[] = {
 	{ AFMOVD,	C_LAUTO,C_NONE,	C_FREG,		31, 8, REGSP,	LFROM },
 	{ AFMOVD,	C_LOREG,C_NONE,	C_FREG,		31, 8, 0,	LFROM },
 
-	{ AFMOVS,	C_FREG,	C_NONE,	C_ADDR,		64, 8, 0,	LTO },
-	{ AFMOVS,	C_ADDR,	C_NONE,	C_FREG,		65, 8, 0,	LFROM },
-	{ AFMOVD,	C_FREG,	C_NONE,	C_ADDR,		64, 8, 0,	LTO },
-	{ AFMOVD,	C_ADDR,	C_NONE,	C_FREG,		65, 8, 0,	LFROM },
+	{ AFMOVS,	C_FREG,	C_NONE,	C_ADDR,		64, 12, 0 },
+	{ AFMOVS,	C_ADDR,	C_NONE,	C_FREG,		65, 12, 0 },
+	{ AFMOVD,	C_FREG,	C_NONE,	C_ADDR,		64, 12, 0 },
+	{ AFMOVD,	C_ADDR,	C_NONE,	C_FREG,		65, 12, 0 },
 
 	{ AFADDS,		C_FREG,	C_NONE,	C_FREG,		54, 4, 0 },
 	{ AFADDS,		C_FREG,	C_REG,	C_FREG,		54, 4, 0 },
@@ -2681,17 +2681,27 @@ if(0 /*debug['P']*/) print("%ux: %P	type %d\n", (uint32)(p->pc), p, o->type);
 		}
 		break;
 	/* reloc ops */
-	case 64: /* movT R,addr */
-		o1 = omovlit(ctxt, AMOV, p, &p->to, REGTMP);
-		if(!o1)
-			break;
-		o2 = olsr12u(ctxt, opstr12(ctxt,p->as), 0, REGTMP, p->from.reg);
+	case 64: /* movT R,addr -> adrp + add + movT R, (REGTMP) */
+		o1 = ADR(1, 0, REGTMP);
+		o2 = opirr(ctxt, AADD) | (REGTMP<<5) | REGTMP;
+		rel = addrel(ctxt->cursym);
+		rel->off = ctxt->pc;
+		rel->siz = 8;
+		rel->sym = p->to.sym;
+		rel->add = p->to.offset;
+		rel->type = R_ADDRARM64;
+		o3 = olsr12u(ctxt, opstr12(ctxt,p->as), 0, REGTMP, p->from.reg);
 		break;
-	case 65: /* movT addr,R */
-		o1 = omovlit(ctxt, AMOV, p, &p->from, REGTMP);
-		if(!o1)
-			break;
-		o2 = olsr12u(ctxt, opldr12(ctxt, p->as), 0, REGTMP, p->to.reg);
+	case 65: /* movT addr,R -> adrp + add + movT (REGTMP), R */
+		o1 = ADR(1, 0, REGTMP);
+		o2 = opirr(ctxt, AADD) | (REGTMP<<5) | REGTMP;
+		rel = addrel(ctxt->cursym);
+		rel->off = ctxt->pc;
+		rel->siz = 8;
+		rel->sym = p->from.sym;
+		rel->add = p->from.offset;
+		rel->type = R_ADDRARM64;
+		o3 = olsr12u(ctxt, opldr12(ctxt, p->as), 0, REGTMP, p->to.reg);
 		break;
 	case 66: /* ldp O(R)!, (r1, r2); ldp (R)O!, (r1, r2) */
 		v = p->from.offset;
