@@ -365,7 +365,9 @@ static Optab optab[] = {
 	{ AWORD,	C_NONE,	C_NONE,	C_ADDR,		14, 4, 0 },
 
 	{ AMOVW,	C_VCON,	C_NONE,	C_REG,		12, 4, 0,	LFROM },
+	{ AMOVW,	C_VCONADDR,	C_NONE,	C_REG,		68, 8, 0 },
 	{ AMOV,	C_VCON,	C_NONE,	C_REG,		12, 4, 0,	LFROM },
+	{ AMOV,	C_VCONADDR,	C_NONE,	C_REG,		68, 8, 0 },
 
 	{ AMOVB,	C_REG,	C_NONE,	C_ADDR,		64, 8, 0,	LTO },
 	{ AMOVBU,	C_REG,	C_NONE,	C_ADDR,		64, 8, 0,	LTO },
@@ -1299,10 +1301,7 @@ cmp(int a, int b)
 			return 1;
 		break;
 	case C_VCON:
-		if(b == C_VCONADDR)
-			return 1;
-		else
-			return cmp(C_LCON, b);
+		return cmp(C_LCON, b);
 	case C_LACON:
 		if(b == C_AACON)
 			return 1;
@@ -2714,6 +2713,18 @@ if(0 /*debug['P']*/) print("%ux: %P	type %d\n", (uint32)(p->pc), p, o->type);
 		else
 			o1 |= 3 << 23;
 		o1 |= (2<<30) | (5<<27) | (((v/8)&0x7f)<<15) | (p->from.offset<<10) | (p->to.reg<<5) | p->from.reg;
+		break;
+	case 68: /* movT $vconaddr(SB), reg -> adrp + add + reloc */
+		if(p->as == AMOVW)
+			ctxt->diag("invalid load of 32-bit address\n%P", p);
+		o1 = ADR(1, 0, p->to.reg);
+		o2 = opirr(ctxt, AADD) | (p->to.reg<<5) | p->to.reg;
+		rel = addrel(ctxt->cursym);
+		rel->off = ctxt->pc;
+		rel->siz = 8;
+		rel->sym = p->from.sym;
+		rel->add = p->from.offset;
+		rel->type = R_ADDRARM64;
 		break;
 	case 90:
 		// This is supposed to be something that stops execution.
