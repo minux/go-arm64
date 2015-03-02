@@ -245,6 +245,7 @@ enum
 {
 	R_ADDR = 1,
 	R_ADDRPOWER, // relocation for loading 31-bit address using addis and addi/ld/st for Power
+	R_ADDRARM64, // relocation for loading 32-bit PC-relative addressing using adrp and add for ARM64
 	R_SIZE,
 	R_CALL, // relocation for direct PC-relative call
 	R_CALLARM, // relocation for ARM direct call
