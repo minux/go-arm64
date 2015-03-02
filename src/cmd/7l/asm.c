@@ -156,13 +156,41 @@ machoreloc1(Reloc *r, vlong sectoff)
 	return -1;
 }
 
+static void
+relocaddr(Reloc *r, LSym *s, vlong *val, vlong dist) {
+	uint32 o0, o1;
+	int i;
+	// it can actually address +/- 4GB, but for simplicity's sake, we will limit
+	// the range to just +/- 2GB, which should be more than enough.
+	if(dist != (int32)dist)
+		diag("program too large, address relocation distance = %lld", dist);
+	dist = (uint32)dist;
+	dist |= ((uvlong)((uint32)dist) >> 31) << 32; // preserve the sign bit
+
+	// the first instruction is always at the lower address, this is endian neutral;
+	// but note that o0 and o1 should still use the target endian.
+	// NOTE: if *val is actual instructions being relocated, then all
+	// these code can be removed.
+	o0 = o1 = 0;
+	for(i = 0; i < 4; i++)
+	       ((uchar*)&o0)[inuxi4[i]] = s->p[r->off + i];
+	for(i = 0; i < 4; i++)
+	       ((uchar*)&o1)[inuxi4[i]] = s->p[r->off + 4 + i];
+
+	o0 |= (((dist >> 12)&3)<<29) | (((dist>>12>>2) & 0x7ffff) << 5);
+	o1 |= (dist & 0xfff) << 10;
+
+	// when laid out, the instruction order must always be o1, o2.
+	if(ctxt->arch->endian == BigEndian)
+		*val = ((vlong)o0 << 32) | o1;
+	else
+		*val = ((vlong)o1 << 32) | o0;
+}
+
 int
 archreloc(Reloc *r, LSym *s, vlong *val)
 {
 	LSym *rs;
-	vlong t;
-	uint32 o0, o1;
-	int i;
 
 	USED(s);
 
@@ -176,19 +204,6 @@ archreloc(Reloc *r, LSym *s, vlong *val)
 			r->xadd = r->add;
 			r->add = 0;
 
-			// if *val is actual instructions being relocated, then all
-			// these code can be removed.
-			o0 = o1 = 0;
-			for(i = 0; i < 4; i++)
-				((uchar*)&o0)[inuxi4[i]] = s->p[r->off + i];
-			for(i = 0; i < 4; i++)
-				((uchar*)&o1)[inuxi4[i]] = s->p[r->off + 4 + i];
-			// when laid out, the instruction order must always be o1, o2.
-			if(ctxt->arch->endian == BigEndian)
-				*val = ((vlong)o0 << 32) | o1;
-			else
-				*val = ((vlong)o1 << 32) | o0;
-
 			// set up addend for eventual relocation via outer symbol.
 			rs = r->sym;
 			while(rs->outer != nil) {
@@ -198,6 +213,16 @@ archreloc(Reloc *r, LSym *s, vlong *val)
 			if(rs->type != SHOSTOBJ && rs->sect == nil)
 				diag("missing section for %s", rs->name);
 			r->xsym = rs;
+
+			switch(ctxt->headtype) {
+			default:
+				diag("archreloc: unknown headtype %s", headstr(ctxt->headtype));
+				break;
+			case Hlinux:
+				// ELF can encode the addend into rela entry
+				relocaddr(r, s, val, 0);
+				break;
+			}
 			break;
 
 		case R_CALLARM64:
@@ -217,27 +242,7 @@ archreloc(Reloc *r, LSym *s, vlong *val)
 		*val = symaddr(r->sym) + r->add - symaddr(linklookup(ctxt, ".got", 0));
 		return 0;
 	case R_ADDRARM64:
-		t = symaddr(r->sym) + r->add - ((s->value + r->off) & ~0xfffull);
-		// it can actually address +/- 4GB, but for simplicity's sake, we will limit
-		// the range to just +/- 2GB, which should be more than enough.
-		if(t != (int32)t)
-			diag("program too large, address relocation distance = %lld", t);
-		t = (uint32)t;
-		t |= ((uvlong)((uint32)t) >> 31) << 32; // preserve the sign bit
-		// the first instruction is always at the lower address, this is endian neutral;
-		// but note that o0 and o1 should still use the target endian.
-		o0 = o1 = 0;
-		for(i = 0; i < 4; i++)
-		       ((uchar*)&o0)[inuxi4[i]] = s->p[r->off + i];
-		for(i = 0; i < 4; i++)
-		       ((uchar*)&o1)[inuxi4[i]] = s->p[r->off + 4 + i];
-		o0 |= (((t >> 12)&3)<<29) | (((t>>12>>2) & 0x7ffff) << 5);
-		o1 |= (t & 0xfff) << 10;
-		// when laid out, the instruction order must always be o1, o2.
-		if(ctxt->arch->endian == BigEndian)
-			*val = ((vlong)o0 << 32) | o1;
-		else
-			*val = ((vlong)o1 << 32) | o0;
+		relocaddr(r, s, val, symaddr(r->sym) + r->add - ((s->value + r->off) & ~0xfffull));
 		return 0;
 	case R_CALLARM64: // bl XXXXXX or b YYYYYY
 		*val = (0xfc000000u & (uint32)r->add) | (uint32)((symaddr(r->sym) + ((uint32)r->add) * 4 - (s->value + r->off)) / 4);
