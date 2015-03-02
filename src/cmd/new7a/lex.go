@@ -186,6 +186,7 @@ var lexinit = []asm.Lextab{
 	{"DAIFSet", LSPREG, arm64.D_DAIFSet},
 	{"DAIFClr", LSPREG, arm64.D_DAIFClr},
 	{"TPIDR_EL0", LSPREG, arm64.D_TPIDR_EL0},
+	{"TPIDRRO_EL0", LSPREG, arm64.D_TPIDRRO_EL0},
 	{"EQ", LCOND, 0},
 	{"NE", LCOND, 1},
 	{"CS", LCOND, 2},
