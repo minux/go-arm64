@@ -120,10 +120,33 @@ func archreloc(r *ld.Reloc, s *ld.LSym, val *int64) int {
 
 		case ld.R_ADDRARM64:
 			r.Done = 0
-			r.Xsym = r.Sym
+
+			// the first instruction is always at the lower address, this is endian neutral;
+			// but note that o0 and o1 should still use the target endian.
+			o0 := ld.Thelinkarch.ByteOrder.Uint32(s.P[r.Off : r.Off+4])
+			o1 := ld.Thelinkarch.ByteOrder.Uint32(s.P[r.Off+4 : r.Off+8])
+
+			// when laid out, the instruction order must always be o1, o2.
+			if ld.Ctxt.Arch.ByteOrder == binary.BigEndian {
+				*val = int64(o0)<<32 | int64(o1)
+			} else {
+				*val = int64(o1)<<32 | int64(o0)
+			}
+
+			// set up addend for eventual relocation via outer symbol.
+			rs := r.Sym
 			r.Xadd = r.Add
-			r.Add = 0
-			break // still need to fill in *val, see below
+			for rs.Outer != nil {
+				r.Xadd += ld.Symaddr(rs) - ld.Symaddr(rs.Outer)
+				rs = rs.Outer
+			}
+
+			if rs.Type != ld.SHOSTOBJ && rs.Sect == nil {
+				ld.Diag("missing section for %s", rs.Name)
+			}
+			r.Xsym = rs
+
+			return 0
 
 		case ld.R_CALLARM64:
 			r.Done = 0
