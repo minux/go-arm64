@@ -258,7 +258,9 @@ var optab = []Optab{
 	{AWORD, C_NONE, C_NONE, C_LEXT, 14, 4, 0, 0, 0},
 	{AWORD, C_NONE, C_NONE, C_ADDR, 14, 4, 0, 0, 0},
 	{AMOVW, C_VCON, C_NONE, C_REG, 12, 4, 0, LFROM, 0},
+	{AMOVW, C_VCONADDR, C_NONE, C_REG, 68, 8, 0, 0, 0},
 	{AMOVD, C_VCON, C_NONE, C_REG, 12, 4, 0, LFROM, 0},
+	{AMOVD, C_VCONADDR, C_NONE, C_REG, 68, 8, 0, 0, 0},
 	{AMOVB, C_REG, C_NONE, C_ADDR, 64, 8, 0, LTO, 0},
 	{AMOVBU, C_REG, C_NONE, C_ADDR, 64, 8, 0, LTO, 0},
 	{AMOVH, C_REG, C_NONE, C_ADDR, 64, 8, 0, LTO, 0},
@@ -1176,12 +1178,7 @@ func cmp(a int, b int) bool {
 		}
 
 	case C_VCON:
-		if b == C_VCONADDR {
-			return true
-		} else {
-			return cmp(C_LCON, b)
-		}
-		fallthrough
+		return cmp(C_LCON, b)
 
 	case C_LACON:
 		if b == C_AACON {
@@ -2766,6 +2763,19 @@ func asmout(ctxt *obj.Link, p *obj.Prog, o *Optab, out []uint32) {
 			o1 |= 3 << 23
 		}
 		o1 |= uint32(int64(2<<30|5<<27|((uint32(v)/8)&0x7f)<<15) | p.From.Offset<<10 | int64(uint32(p.To.Reg&31)<<5) | int64(p.From.Reg&31))
+
+	case 68: /* movT $vconaddr(SB), reg -> adrp + add + reloc */
+		if p.As == AMOVW {
+			ctxt.Diag("invalid load of 32-bit address: %v", p)
+		}
+		o1 = ADR(1, 0, uint32(p.To.Reg))
+		o2 = opirr(ctxt, AADD) | uint32(p.To.Reg&31)<<5 | uint32(p.To.Reg&31)
+		rel := obj.Addrel(ctxt.Cursym)
+		rel.Off = int32(ctxt.Pc)
+		rel.Siz = 8
+		rel.Sym = p.From.Sym
+		rel.Add = p.From.Offset
+		rel.Type = obj.R_ADDRARM64
 
 	// This is supposed to be something that stops execution.
 	// It's not supposed to be reached, ever, but if it is, we'd
