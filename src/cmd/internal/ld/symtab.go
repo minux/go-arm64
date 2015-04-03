@@ -168,7 +168,7 @@ func putelfsectionsym(s *LSym, shndx int) {
 func putelfsymshndx(sympos int64, shndx int) {
 	here := Cpos()
 	switch Thearch.Thechar {
-	case '6':
+	case '6', '7': // TODO(minux): should ppc64/ppc64le also be here?
 		Cseek(sympos + 6)
 
 	default:
