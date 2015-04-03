@@ -261,16 +261,16 @@ var optab = []Optab{
 	{AMOVW, C_VCONADDR, C_NONE, C_REG, 68, 8, 0, 0, 0},
 	{AMOVD, C_VCON, C_NONE, C_REG, 12, 4, 0, LFROM, 0},
 	{AMOVD, C_VCONADDR, C_NONE, C_REG, 68, 8, 0, 0, 0},
-	{AMOVB, C_REG, C_NONE, C_ADDR, 64, 8, 0, LTO, 0},
-	{AMOVBU, C_REG, C_NONE, C_ADDR, 64, 8, 0, LTO, 0},
-	{AMOVH, C_REG, C_NONE, C_ADDR, 64, 8, 0, LTO, 0},
-	{AMOVW, C_REG, C_NONE, C_ADDR, 64, 8, 0, LTO, 0},
-	{AMOVD, C_REG, C_NONE, C_ADDR, 64, 8, 0, LTO, 0},
-	{AMOVB, C_ADDR, C_NONE, C_REG, 65, 8, 0, LFROM, 0},
-	{AMOVBU, C_ADDR, C_NONE, C_REG, 65, 8, 0, LFROM, 0},
-	{AMOVH, C_ADDR, C_NONE, C_REG, 65, 8, 0, LFROM, 0},
-	{AMOVW, C_ADDR, C_NONE, C_REG, 65, 8, 0, LFROM, 0},
-	{AMOVD, C_ADDR, C_NONE, C_REG, 65, 8, 0, LFROM, 0},
+	{AMOVB, C_REG, C_NONE, C_ADDR, 64, 12, 0, 0, 0},
+	{AMOVBU, C_REG, C_NONE, C_ADDR, 64, 12, 0, 0, 0},
+	{AMOVH, C_REG, C_NONE, C_ADDR, 64, 12, 0, 0, 0},
+	{AMOVW, C_REG, C_NONE, C_ADDR, 64, 12, 0, 0, 0},
+	{AMOVD, C_REG, C_NONE, C_ADDR, 64, 12, 0, 0, 0},
+	{AMOVB, C_ADDR, C_NONE, C_REG, 65, 12, 0, 0, 0},
+	{AMOVBU, C_ADDR, C_NONE, C_REG, 65, 12, 0, 0, 0},
+	{AMOVH, C_ADDR, C_NONE, C_REG, 65, 12, 0, 0, 0},
+	{AMOVW, C_ADDR, C_NONE, C_REG, 65, 12, 0, 0, 0},
+	{AMOVD, C_ADDR, C_NONE, C_REG, 65, 12, 0, 0, 0},
 	{AMUL, C_REG, C_REG, C_REG, 15, 4, 0, 0, 0},
 	{AMUL, C_REG, C_NONE, C_REG, 15, 4, 0, 0, 0},
 	{AMADD, C_REG, C_REG, C_REG, 15, 4, 0, 0, 0},
@@ -449,10 +449,10 @@ var optab = []Optab{
 	{AFMOVS, C_LOREG, C_NONE, C_FREG, 31, 8, 0, LFROM, 0},
 	{AFMOVD, C_LAUTO, C_NONE, C_FREG, 31, 8, REGSP, LFROM, 0},
 	{AFMOVD, C_LOREG, C_NONE, C_FREG, 31, 8, 0, LFROM, 0},
-	{AFMOVS, C_FREG, C_NONE, C_ADDR, 64, 8, 0, LTO, 0},
-	{AFMOVS, C_ADDR, C_NONE, C_FREG, 65, 8, 0, LFROM, 0},
-	{AFMOVD, C_FREG, C_NONE, C_ADDR, 64, 8, 0, LTO, 0},
-	{AFMOVD, C_ADDR, C_NONE, C_FREG, 65, 8, 0, LFROM, 0},
+	{AFMOVS, C_FREG, C_NONE, C_ADDR, 64, 12, 0, 0, 0},
+	{AFMOVS, C_ADDR, C_NONE, C_FREG, 65, 12, 0, 0, 0},
+	{AFMOVD, C_FREG, C_NONE, C_ADDR, 64, 12, 0, 0, 0},
+	{AFMOVD, C_ADDR, C_NONE, C_FREG, 65, 12, 0, 0, 0},
 	{AFADDS, C_FREG, C_NONE, C_FREG, 54, 4, 0, 0, 0},
 	{AFADDS, C_FREG, C_FREG, C_FREG, 54, 4, 0, 0, 0},
 	{AFADDS, C_FCON, C_NONE, C_FREG, 54, 4, 0, 0, 0},
@@ -2721,21 +2721,27 @@ func asmout(ctxt *obj.Link, p *obj.Prog, o *Optab, out []uint32) {
 		}
 
 		/* reloc ops */
-	case 64: /* movT R,addr */
-		o1 = omovlit(ctxt, AMOVD, p, &p.To, REGTMP)
+	case 64: /* movT R,addr -> adrp + add + movT R, (REGTMP) */
+		o1 = ADR(1, 0, REGTMP)
+		o2 = opirr(ctxt, AADD) | REGTMP&31<<5 | REGTMP&31
+		rel := obj.Addrel(ctxt.Cursym)
+		rel.Off = int32(ctxt.Pc)
+		rel.Siz = 8
+		rel.Sym = p.To.Sym
+		rel.Add = p.To.Offset
+		rel.Type = obj.R_ADDRARM64
+		o3 = olsr12u(ctxt, int32(opstr12(ctxt, int(p.As))), 0, REGTMP, int(p.From.Reg))
 
-		if !(o1 != 0) {
-			break
-		}
-		o2 = olsr12u(ctxt, int32(opstr12(ctxt, int(p.As))), 0, REGTMP, int(p.From.Reg))
-
-	case 65: /* movT addr,R */
-		o1 = omovlit(ctxt, AMOVD, p, &p.From, REGTMP)
-
-		if !(o1 != 0) {
-			break
-		}
-		o2 = olsr12u(ctxt, int32(opldr12(ctxt, int(p.As))), 0, REGTMP, int(p.To.Reg))
+	case 65: /* movT addr,R -> adrp + add + movT (REGTMP), R */
+		o1 = ADR(1, 0, REGTMP)
+		o2 = opirr(ctxt, AADD) | REGTMP&31<<5 | REGTMP&31
+		rel := obj.Addrel(ctxt.Cursym)
+		rel.Off = int32(ctxt.Pc)
+		rel.Siz = 8
+		rel.Sym = p.From.Sym
+		rel.Add = p.From.Offset
+		rel.Type = obj.R_ADDRARM64
+		o3 = olsr12u(ctxt, int32(opldr12(ctxt, int(p.As))), 0, REGTMP, int(p.To.Reg))
 
 	case 66: /* ldp O(R)!, (r1, r2); ldp (R)O!, (r1, r2) */
 		v := int32(p.From.Offset)
