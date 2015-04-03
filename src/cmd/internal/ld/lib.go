@@ -354,6 +354,11 @@ func loadlib() {
 			Linkmode = LinkInternal
 		}
 
+		// cmd/7l doesn't support cgo internal linking
+		if iscgo && goarch == "arm64" {
+			Linkmode = LinkExternal
+		}
+
 		// Force external linking for android.
 		if goos == "android" {
 			Linkmode = LinkExternal
