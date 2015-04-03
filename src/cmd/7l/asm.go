@@ -203,8 +203,7 @@ func archrelocvariant(r *ld.Reloc, s *ld.LSym, t int64) int64 {
 }
 
 func adddynsym(ctxt *ld.Link, s *ld.LSym) {
-	// TODO(minux): implement.
-	log.Printf("adddynsym: %s, ignored.", s.Name)
+	// TODO(minux): implement when needed.
 }
 
 func adddynlib(lib string) {
