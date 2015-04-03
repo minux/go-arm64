@@ -90,7 +90,7 @@ func elfreloc1(r *ld.Reloc, sectoff int64) int {
 		ld.Thearch.Vput(ld.R_AARCH64_CALL26 | uint64(elfsym)<<32)
 
 	}
-	ld.Thearch.Vput(uint64(r.Add))
+	ld.Thearch.Vput(uint64(r.Xadd))
 
 	return 0
 }
